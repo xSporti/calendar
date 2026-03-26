@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes: dark --default;
+}
+
+:root {
+  --fc-accent: oklch(var(--p));
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── FullCalendar dark overrides ─────────────────────────────── */
+.fc {
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th,
+.fc-theme-standard .fc-scrollgrid {
+  border-color: oklch(var(--b3)) !important;
+}
+
+.fc-col-header-cell {
+  background: oklch(var(--b2)) !important;
+  padding: 8px 0 !important;
+}
+.fc-col-header-cell a {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: oklch(var(--bc) / 0.45) !important;
+  text-decoration: none !important;
+}
+
+.fc-daygrid-day {
+  background: oklch(var(--b1)) !important;
+  transition: background 0.12s;
+}
+.fc-daygrid-day:hover {
+  background: oklch(var(--b2)) !important;
+}
+.fc-day-today {
+  background: oklch(var(--p) / 0.08) !important;
+}
+.fc-day-today .fc-daygrid-day-number {
+  color: oklch(var(--p)) !important;
+  font-weight: 600 !important;
+}
+.fc-daygrid-day-number {
+  color: oklch(var(--bc) / 0.45) !important;
+  font-size: 12px !important;
+  padding: 5px 7px !important;
+  text-decoration: none !important;
+}
+
+.fc-toolbar-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: oklch(var(--bc)) !important;
+}
+
+.fc-button {
+  background: oklch(var(--b2)) !important;
+  border: 1px solid oklch(var(--b3)) !important;
+  color: oklch(var(--bc) / 0.65) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  padding: 5px 11px !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  transition: all 0.12s !important;
+}
+.fc-button:hover {
+  background: oklch(var(--b3)) !important;
+  color: oklch(var(--bc)) !important;
+}
+.fc-button-active,
+.fc-button-primary:not(:disabled).fc-button-active {
+  background: oklch(var(--p)) !important;
+  border-color: oklch(var(--p)) !important;
+  color: oklch(var(--pc)) !important;
+}
+
+.fc-event {
+  border: none !important;
+  border-radius: 5px !important;
+  font-size: 12px !important;
+  padding: 2px 5px !important;
+  cursor: pointer !important;
+}
+.fc-event:hover {
+  opacity: 0.82 !important;
+}
+
+.fc-toolbar {
+  margin-bottom: 12px !important;
+}
+.fc-timegrid-slot {
+  background: oklch(var(--b1)) !important;
+}
+.fc-timegrid-slot-label {
+  color: oklch(var(--bc) / 0.4) !important;
+  font-size: 11px !important;
+}
+.fc-timegrid-now-indicator-line {
+  border-color: oklch(var(--p)) !important;
+}
+.fc-timegrid-now-indicator-arrow {
+  border-color: oklch(var(--p)) !important;
+}
+
+/* ── Clock picker ────────────────────────────────────────────── */
+.clock-canvas {
+  cursor: pointer;
+  touch-action: none;
+}
+/* ─────────────────────────────── MEINE ─────────────────────────────── */
+table.fc-scrollgrid.fc-scrollgrid-liquid {
+  border: none;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border: 1px solid #666 !important;
+}
+
+.fc-theme-standard th {
+  border: none !important;
+}
+.fc-timegrid-slots tr > * {
+  border: none !important;
+}
+
+.fc-timegrid-slots tr:nth-child(even) > * {
+  /*border-left: none !important;
+  border-right: none !important;*/
+  border-bottom: 1px solid #333 !important;
+  border-top: 1px solid rgba(0, 0, 0, 0) !important;
+}

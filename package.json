@@ -1,0 +1,33 @@
+{
+  "name": "sporti-cal",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fullcalendar/core": "^6.1.11",
+    "@fullcalendar/daygrid": "^6.1.11",
+    "@fullcalendar/interaction": "^6.1.11",
+    "@fullcalendar/react": "^6.1.11",
+    "@fullcalendar/rrule": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.11",
+    "etebase": "^0.43.1",
+    "ical.js": "^1.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rrule": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "daisyui": "^5.0.0",
+    "tailwindcss": "^4.1.0",
+    "vite": "^5.4.2"
+  }
+}
