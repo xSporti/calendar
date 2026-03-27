@@ -173,6 +173,13 @@ export function useCalendar() {
     [showStatus, calendars],
   );
 
+  async function deleteCalendar(uid) {
+    const cal = calendars.find((c) => c.uid === uid);
+    await EteService.deleteCalendar(cal.col);
+    setCalendars((prev) => prev.filter((c) => c.uid !== uid));
+    setEvents((prev) => prev.filter((e) => e.calUid !== uid));
+  }
+
   return {
     calendars,
     events,
@@ -185,5 +192,6 @@ export function useCalendar() {
     addEvent,
     editEvent,
     removeEvent,
+    deleteCalendar,
   };
 }

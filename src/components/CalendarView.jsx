@@ -32,6 +32,7 @@ export default function CalendarView({ onLogout }) {
     addEvent,
     editEvent,
     removeEvent,
+    deleteCalendar,
   } = useCalendar();
 
   const [selectedUid, setSelectedUid] = useState('all');
@@ -107,8 +108,7 @@ export default function CalendarView({ onLogout }) {
   }
 
   async function handleDeleteCalendar(uid) {
-    const cal = calendars.find((c) => c.uid === uid);
-    await EteService.deleteCalendar(cal.col);
+    await deleteCalendar(uid);
     setEditingCal(null);
   }
 
@@ -122,6 +122,7 @@ export default function CalendarView({ onLogout }) {
     if (!ev) return;
     await editEvent(ev.id, {
       uid: ev.id,
+      calUid: ev.calUid,
       title: ev.title,
       start: info.event.start,
       end: info.event.end || info.event.start,

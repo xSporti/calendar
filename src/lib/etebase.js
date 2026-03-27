@@ -21,7 +21,7 @@ export function getAccount() {
 export async function fetchCalendars() {
   const mgr = _account.getCollectionManager();
   const res = await mgr.list('etebase.vevent');
-  return res.data;
+  return res.data.filter((c) => !c.isDeleted);
 }
 
 export function getItemManager(collection) {
@@ -177,6 +177,6 @@ export async function updateCalendar(collection, name, description, color) {
 
 export async function deleteCalendar(collection) {
   const mgr = _account.getCollectionManager();
-  await mgr.delete(collection);
+  await collection.delete();
   await mgr.upload(collection);
 }
