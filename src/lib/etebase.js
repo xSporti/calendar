@@ -164,7 +164,7 @@ export async function createCalendar(name, description, color) {
 }
 export async function updateCalendar(collection, name, description, color) {
   const mgr = _account.getCollectionManager();
-  const meta = collection.getMeta();
+  const meta = await collection.getMeta();
   await collection.setMeta({
     ...meta,
     name,

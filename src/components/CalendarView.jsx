@@ -103,7 +103,7 @@ export default function CalendarView({ onLogout }) {
       data.color,
     );
     setEditingCal(null);
-    await sync(cal.col);
+    await loadCalendars();
   }
 
   async function handleDeleteCalendar(uid) {

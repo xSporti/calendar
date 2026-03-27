@@ -17,11 +17,16 @@ export function useCalendar() {
   const loadCalendars = useCallback(async () => {
     const cols = await EteService.fetchCalendars();
     const withMeta = await Promise.all(
-      cols.map(async (c) => ({
-        col: c,
-        uid: c.uid,
-        name: (await c.getMeta()).name || c.uid,
-      })),
+      cols.map(async (c) => {
+        const meta = await c.getMeta();
+        return {
+          col: c,
+          uid: c.uid,
+          name: meta.name || c.uid,
+          description: meta.description || '',
+          color: meta.color || null,
+        };
+      }),
     );
     setCalendars(withMeta);
     return withMeta;
