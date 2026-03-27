@@ -327,7 +327,19 @@ export default function CalendarView({ onLogout }) {
             <li>
               <hr className="my-1 border-base-300" />
             </li>
-
+            <li>
+              <div
+                className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-lg hover:bg-base-300 transition-colors"
+                onClick={() => handleSelectCal('all')}
+              >
+                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-base-content/30" />
+                <span
+                  className={`text-sm truncate whitespace-nowrap flex-1 ${selectedUid === 'all' ? 'font-medium text-primary' : ''}`}
+                >
+                  Alle Kalender
+                </span>
+              </div>
+            </li>
             {calendars.map((c, i) => (
               <li key={c.uid} className="group relative">
                 <div
