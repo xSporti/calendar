@@ -118,17 +118,35 @@ export function useCalendar() {
       const item = itemCache.current[uid];
       if (!item) return;
       showStatus('Speichert…');
-      const mgr = item._mgr || itemManager.current;
-      await EteService.updateEvent(mgr, item, { ...data, uid });
+
+      const oldCalUid = item._calUid;
+      const newCalUid = data.calUid;
+      const calChanged = oldCalUid !== newCalUid;
+
+      if (calChanged) {
+        const oldMgr = item._mgr || itemManager.current;
+        await EteService.deleteEvent(oldMgr, item);
+
+        const newCal = calendars.find((c) => c.uid === newCalUid);
+        const newMgr = EteService.getItemManager(newCal.col);
+        const { uid: newUid, item: newItem } = await EteService.createEvent(
+          newMgr,
+          { ...data, uid },
+        );
+        newItem._calUid = newCalUid;
+        newItem._mgr = newMgr;
+        itemCache.current[newUid] = newItem;
+        delete itemCache.current[uid];
+      } else {
+        const mgr = item._mgr || itemManager.current;
+        await EteService.updateEvent(mgr, item, { ...data, uid });
+      }
+
       setEvents((prev) => {
         const old = prev.find((e) => e.id === uid) || {};
         return [
           ...prev.filter((e) => e.id !== uid),
-          {
-            ...old,
-            id: uid,
-            ...data,
-          },
+          { ...old, id: uid, ...data },
         ];
       });
       showStatus('Gespeichert ✓');

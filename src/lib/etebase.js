@@ -137,7 +137,7 @@ export async function updateEvent(itemManager, item, data) {
 }
 
 export async function deleteEvent(itemManager, item) {
-  item.delete(true);
+  await item.delete(true);
   await itemManager.batch([item]);
 }
 
