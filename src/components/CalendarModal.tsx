@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { COLORS } from '../constants/colors';
 
-export default function CalendarModal({ onSave, onClose }) {
+interface Props {
+  onSave: (data: { name: string; description: string; color: string }) => void;
+  onClose: () => void;
+}
+
+export default function CalendarModal({ onSave, onClose }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#6c63ff');

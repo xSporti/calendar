@@ -5,21 +5,27 @@ import rrulePlugin from '@fullcalendar/rrule';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import deLocale from '@fullcalendar/core/locales/de';
+import { EventClickArg, EventDropArg, DatesSetArg } from '@fullcalendar/core';
+import { EventResizeDoneArg } from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 import { useCalendar } from '../hooks/useCalendar';
 import { logout } from '../lib/etebase';
 import CalendarModal from './CalendarModal';
 import * as EteService from '../lib/etebase';
 import CalendarEditModal from './CalendarEditModal';
+import type { Calendar, CalendarEvent } from '../types';
+import { COLORS } from '../constants/colors';
 
-const COLORS = [
-  'oklch(65% 0.25 290)',
-  'oklch(65% 0.2 160)',
-  'oklch(65% 0.2 30)',
-  'oklch(65% 0.2 0)',
-];
+interface Props {
+  onLogout: () => void;
+}
 
-export default function CalendarView({ onLogout }) {
+interface MoreLinkData {
+  date: Date;
+  events: any[];
+}
+
+export default function CalendarView({ onLogout }: Props) {
   const {
     calendars,
     events,
@@ -35,18 +41,18 @@ export default function CalendarView({ onLogout }) {
     deleteCalendar,
   } = useCalendar();
 
-  const [selectedUid, setSelectedUid] = useState('all');
-  const [selectedCal, setSelectedCal] = useState(null);
+  const [selectedUid, setSelectedUid] = useState<string>('all');
+  const [selectedCal, setSelectedCal] = useState<Calendar | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [calModalOpen, setCalModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [defaultStart, setDefaultStart] = useState(null);
-  const [moreLinkData, setMoreLinkData] = useState(null);
-  const calendarRef = useRef(null);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [defaultStart, setDefaultStart] = useState<Date | null>(null);
+  const [moreLinkData, setMoreLinkData] = useState<MoreLinkData | null>(null);
+  const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [calTitle, setCalTitle] = useState('');
   const [isToday, setIsToday] = useState(true);
-  const [editingCal, setEditingCal] = useState(null);
+  const [editingCal, setEditingCal] = useState<Calendar | null>(null);
 
   useEffect(() => {
     loadCalendars().then((cols) => {
@@ -54,7 +60,7 @@ export default function CalendarView({ onLogout }) {
     });
   }, []);
 
-  function handleSelectCal(uid) {
+  function handleSelectCal(uid: string) {
     if (uid === 'all') {
       setSelectedUid('all');
       setSelectedCal(null);
@@ -68,37 +74,52 @@ export default function CalendarView({ onLogout }) {
     }
   }
 
-  function handleEventClick(info) {
-    const ev = events.find((e) => e.id === info.event.id);
-    setEditingEvent(ev || null);
+  function openEvent(ev: CalendarEvent | null) {
+    setEditingEvent(ev);
     setDefaultStart(null);
     setModalOpen(true);
   }
 
-  async function handleSave(data) {
-    setModalOpen(false);
-    if (editingEvent)
-      await editEvent(editingEvent.id, { uid: editingEvent.id, ...data });
-    else await addEvent(data);
+  function handleEventClick(info: EventClickArg) {
+    const ev = events.find((e) => e.id === info.event.id);
+    setEditingEvent(ev ?? null);
+    setDefaultStart(null);
+    setModalOpen(true);
   }
 
-  async function handleDelete(mode = 'all') {
+  async function handleSave(data: CalendarEvent) {
+    setModalOpen(false);
+    if (editingEvent) {
+      await editEvent(editingEvent.id!, { ...data, id: editingEvent.id });
+    } else {
+      await addEvent(data);
+    }
+  }
+
+  async function handleDelete(mode: 'all' | 'this' = 'all') {
     if (!editingEvent) return;
     setModalOpen(false);
-    await removeEvent(editingEvent.id, mode, editingEvent);
+    await removeEvent(editingEvent.id!, mode, editingEvent);
   }
 
-  async function handleCreateCalendar(data) {
+  async function handleCreateCalendar(data: {
+    name: string;
+    description: string;
+    color: string;
+  }) {
     setCalModalOpen(false);
     await EteService.createCalendar(data.name, data.description, data.color);
     const cols = await loadCalendars();
     selectAll(cols);
   }
 
-  async function handleEditCalendar(uid, data) {
+  async function handleEditCalendar(
+    uid: string,
+    data: { name: string; description: string; color: string },
+  ) {
     const cal = calendars.find((c) => c.uid === uid);
     await EteService.updateCalendar(
-      cal.col,
+      cal!.col,
       data.name,
       data.description,
       data.color,
@@ -107,7 +128,7 @@ export default function CalendarView({ onLogout }) {
     await loadCalendars();
   }
 
-  async function handleDeleteCalendar(uid) {
+  async function handleDeleteCalendar(uid: string) {
     await deleteCalendar(uid);
     setEditingCal(null);
   }
@@ -117,15 +138,17 @@ export default function CalendarView({ onLogout }) {
     onLogout();
   }
 
-  async function handleEventDrop(info) {
+  async function handleEventDrop(info: EventDropArg) {
     const ev = events.find((e) => e.id === info.event.id);
     if (!ev) return;
-    await editEvent(ev.id, {
-      uid: ev.id,
+
+    await editEvent(ev.id!, {
+      id: ev.id,
+      uid: ev.uid,
       calUid: ev.calUid,
-      title: ev.title,
-      start: info.event.start,
-      end: info.event.end || info.event.start,
+      title: ev.title ?? '',
+      start: info.event.start!,
+      end: info.event.end ?? info.event.start!,
       allDay: info.event.allDay,
       description: ev.description,
       location: ev.location,
@@ -133,14 +156,17 @@ export default function CalendarView({ onLogout }) {
     });
   }
 
-  async function handleEventResize(info) {
+  async function handleEventResize(info: EventResizeDoneArg) {
     const ev = events.find((e) => e.id === info.event.id);
     if (!ev) return;
-    await editEvent(ev.id, {
-      uid: ev.id,
-      title: ev.title,
-      start: info.event.start,
-      end: info.event.end || info.event.start,
+
+    await editEvent(ev.id!, {
+      id: ev.id,
+      uid: ev.uid,
+      calUid: ev.calUid,
+      title: ev.title ?? '',
+      start: info.event.start!,
+      end: info.event.end ?? info.event.start!,
       allDay: info.event.allDay,
       description: ev.description,
       location: ev.location,
@@ -150,7 +176,9 @@ export default function CalendarView({ onLogout }) {
 
   const fcEvents = events.map((ev) => {
     const cal = calendars.find((c) => c.uid === ev.calUid);
-    const color = cal?.color || COLORS[calendars.indexOf(cal) % COLORS.length];
+    const calIndex = cal ? calendars.indexOf(cal) : 0;
+    const color: string = (cal?.color ||
+      COLORS[calIndex % COLORS.length].value) as string;
     const base = {
       id: ev.id,
       title: ev.title,
@@ -226,7 +254,7 @@ export default function CalendarView({ onLogout }) {
           {/* Navigation */}
           <button
             className="btn btn-ghost btn-sm btn-square btn-outline btn-primary text-3xl"
-            onClick={() => calendarRef.current.getApi().prev()}
+            onClick={() => calendarRef.current?.getApi().prev()}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -245,7 +273,7 @@ export default function CalendarView({ onLogout }) {
           </button>
           <button
             className="btn btn-ghost btn-sm btn-square btn-outline btn-primary text-3xl"
-            onClick={() => calendarRef.current.getApi().next()}
+            onClick={() => calendarRef.current?.getApi().next()}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -265,7 +293,7 @@ export default function CalendarView({ onLogout }) {
 
           <button
             className={`btn btn-sm ${isToday ? 'btn-ghost cursor-default pointer-events-none' : 'btn-ghost btn-outline btn-primary'}`}
-            onClick={() => !isToday && calendarRef.current.getApi().today()}
+            onClick={() => !isToday && calendarRef.current?.getApi().today()}
           >
             Heute
           </button>
@@ -283,7 +311,7 @@ export default function CalendarView({ onLogout }) {
             <button
               className="join-item btn btn-sm btn-outline btn-primary"
               onClick={() =>
-                calendarRef.current.getApi().changeView('dayGridMonth')
+                calendarRef.current?.getApi().changeView('dayGridMonth')
               }
             >
               Monat
@@ -291,7 +319,7 @@ export default function CalendarView({ onLogout }) {
             <button
               className="join-item btn btn-sm btn-outline btn-primary"
               onClick={() =>
-                calendarRef.current.getApi().changeView('timeGridWeek')
+                calendarRef.current?.getApi().changeView('timeGridWeek')
               }
             >
               Woche
@@ -299,7 +327,7 @@ export default function CalendarView({ onLogout }) {
             <button
               className="join-item btn btn-sm btn-outline btn-primary"
               onClick={() =>
-                calendarRef.current.getApi().changeView('timeGridDay')
+                calendarRef.current?.getApi().changeView('timeGridDay')
               }
             >
               Tag
@@ -350,7 +378,8 @@ export default function CalendarView({ onLogout }) {
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{
-                      backgroundColor: c.color || COLORS[i % COLORS.length],
+                      backgroundColor:
+                        c.color || COLORS[i % COLORS.length].value,
                     }}
                   />
                   <span
@@ -400,7 +429,7 @@ export default function CalendarView({ onLogout }) {
               onClick={() =>
                 selectedUid === 'all'
                   ? selectAll(calendars)
-                  : sync(selectedCal?.col)
+                  : sync(selectedCal?.col ?? null, false, calendars)
               }
             >
               ↻ Sync
@@ -431,7 +460,8 @@ export default function CalendarView({ onLogout }) {
             headerToolbar={false}
             height="100%"
             dayMaxEvents={true}
-            datesSet={(arg) => {
+            // datesSet Callback
+            datesSet={(arg: DatesSetArg) => {
               setCalTitle(arg.view.title);
               const now = new Date();
               setIsToday(now >= arg.start && now < arg.end);
@@ -445,7 +475,7 @@ export default function CalendarView({ onLogout }) {
             }}
             navLinks={true}
             navLinkDayClick={(date) => {
-              calendarRef.current.getApi().changeView('timeGridDay', date);
+              calendarRef.current?.getApi().changeView('timeGridDay', date);
             }}
             events={fcEvents}
             editable={true}
@@ -497,7 +527,7 @@ export default function CalendarView({ onLogout }) {
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
                     onClick={() => {
                       setMoreLinkData(null);
-                      handleEventClick({ event: ev });
+                      openEvent(events.find((e) => e.id === ev.id) || null);
                     }}
                   >
                     <span
@@ -535,7 +565,11 @@ export default function CalendarView({ onLogout }) {
         {editingCal && (
           <CalendarEditModal
             calendar={editingCal}
-            onSave={(data) => handleEditCalendar(editingCal.uid, data)}
+            onSave={(data: {
+              name: string;
+              description: string;
+              color: string;
+            }) => handleEditCalendar(editingCal.uid, data)}
             onDelete={() => handleDeleteCalendar(editingCal.uid)}
             onClose={() => setEditingCal(null)}
           />

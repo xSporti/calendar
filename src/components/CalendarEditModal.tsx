@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { COLORS } from '../constants/colors';
 
+interface Calendar {
+  name?: string;
+  description?: string;
+  color?: string | null;
+}
+
+interface Props {
+  calendar: Calendar;
+  onSave: (data: { name: string; description: string; color: string }) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}
+
 export default function CalendarEditModal({
   calendar,
   onSave,
   onDelete,
   onClose,
-}) {
+}: Props) {
   const [name, setName] = useState(calendar.name || '');
   const [description, setDescription] = useState(calendar.description || '');
   const [color, setColor] = useState(calendar.color || '#6c63ff');

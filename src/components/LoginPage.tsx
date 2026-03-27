@@ -1,22 +1,28 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { login } from '../lib/etebase';
 
-export default function LoginPage({ onLogin }) {
+interface Props {
+  onLogin: () => void;
+}
+
+export default function LoginPage({ onLogin }: Props) {
   const [serverUrl, setServerUrl] = useState('https://calendar.sporti.cloud');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       await login(serverUrl.trim(), username.trim(), password);
       onLogin();
-    } catch (err) {
-      setError('Anmeldung fehlgeschlagen: ' + err.message);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unbekannter Fehler';
+      setError('Anmeldung fehlgeschlagen: ' + errorMessage);
     } finally {
       setLoading(false);
     }

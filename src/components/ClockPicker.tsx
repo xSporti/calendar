@@ -5,21 +5,27 @@ const CX = SIZE / 2,
   CY = SIZE / 2,
   R = 96;
 
-function pad(n) {
+function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-function angleToVal(angle, total) {
+function angleToVal(angle: number, total: number): number {
   let v = Math.round((angle / (Math.PI * 2)) * total);
   return ((v % total) + total) % total;
 }
-function valueToAngle(val, total) {
+
+function valueToAngle(val: number, total: number): number {
   return (val / total) * Math.PI * 2 - Math.PI / 2;
 }
 
-export default function ClockPicker({ value, onChange }) {
-  const canvasRef = useRef(null);
-  const [phase, setPhase] = useState('h');
+interface Props {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export default function ClockPicker({ value, onChange }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [phase, setPhase] = useState<'h' | 'm'>('h');
   const [manualH, setManualH] = useState('');
   const [manualM, setManualM] = useState('');
   const dragging = useRef(false);
@@ -35,6 +41,7 @@ export default function ClockPicker({ value, onChange }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = SIZE * dpr;
     canvas.height = SIZE * dpr;
@@ -54,7 +61,7 @@ export default function ClockPicker({ value, onChange }) {
       for (let i = 0; i < 24; i++) {
         const isOuter = i >= 12;
         const r = isOuter ? R : R * 0.6;
-        const angle = valueToAngle(i % 12, 12); // beide Ringe 12 Positionen
+        const angle = valueToAngle(i % 12, 12);
         const x = CX + r * Math.cos(angle);
         const y = CY + r * Math.sin(angle);
         const isActive = i === h;
@@ -127,9 +134,12 @@ export default function ClockPicker({ value, onChange }) {
     ctx.fill();
   }
 
-  function getAngle(e, canvas) {
+  function getAngle(
+    e: React.MouseEvent | React.TouchEvent,
+    canvas: HTMLCanvasElement,
+  ): number {
     const rect = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
+    const src = 'touches' in e ? e.touches[0] : e;
     const dx = src.clientX - rect.left - CX;
     const dy = src.clientY - rect.top - CY;
     let angle = Math.atan2(dy, dx) + Math.PI / 2;
@@ -137,15 +147,17 @@ export default function ClockPicker({ value, onChange }) {
     return angle;
   }
 
-  function handleInteract(e, finalize = false) {
+  function handleInteract(
+    e: React.MouseEvent | React.TouchEvent,
+    finalize = false,
+  ): void {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const angle = getAngle(e, canvas);
 
     if (phase === 'h') {
-      // determine inner vs outer ring by distance from center
       const rect = canvas.getBoundingClientRect();
-      const src = e.touches ? e.touches[0] : e;
+      const src = 'touches' in e ? e.touches[0] : e;
       const dx = src.clientX - rect.left - CX;
       const dy = src.clientY - rect.top - CY;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -153,10 +165,8 @@ export default function ClockPicker({ value, onChange }) {
 
       let newH = angleToVal(angle, 12);
       if (isOuter) {
-        newH = newH + 12; // outer: 12-23, 0→12, 1→13 etc.
+        newH = newH + 12;
         if (newH === 24) newH = 12;
-      } else {
-        // inner: 0-11, bleibt wie es ist
       }
       newH = Math.min(23, Math.max(0, newH));
       onChange(`${pad(newH)}:${pad(m)}`);
@@ -167,22 +177,7 @@ export default function ClockPicker({ value, onChange }) {
     }
   }
 
-  function onDown(e) {
-    dragging.current = true;
-    handleInteract(e);
-  }
-  function onMove(e) {
-    if (dragging.current) handleInteract(e);
-  }
-  function onUp(e) {
-    if (dragging.current) {
-      handleInteract(e, true);
-      dragging.current = false;
-    }
-  }
-
-  // Manual input handlers
-  function handleManualH(e) {
+  function handleManualH(e: React.ChangeEvent<HTMLInputElement>): void {
     const val = e.target.value.replace(/\D/g, '').slice(0, 2);
     setManualH(val);
     const num = parseInt(val);
@@ -192,13 +187,29 @@ export default function ClockPicker({ value, onChange }) {
     }
   }
 
-  function handleManualM(e) {
+  function handleManualM(e: React.ChangeEvent<HTMLInputElement>): void {
     const val = e.target.value.replace(/\D/g, '').slice(0, 2);
     setManualM(val);
     const num = parseInt(val);
     if (val.length === 2 && num >= 0 && num <= 59) {
       onChange(`${pad(h)}:${pad(num)}`);
       setManualM('');
+    }
+  }
+
+  function onDown(e: React.MouseEvent | React.TouchEvent): void {
+    dragging.current = true;
+    handleInteract(e);
+  }
+
+  function onMove(e: React.MouseEvent | React.TouchEvent): void {
+    if (dragging.current) handleInteract(e);
+  }
+
+  function onUp(e: React.MouseEvent | React.TouchEvent): void {
+    if (dragging.current) {
+      handleInteract(e, true);
+      dragging.current = false;
     }
   }
 
@@ -255,15 +266,15 @@ export default function ClockPicker({ value, onChange }) {
       <canvas
         ref={canvasRef}
         style={{ width: SIZE, height: SIZE, cursor: 'pointer' }}
-        onMouseDown={onDown}
-        onMouseMove={onMove}
-        onMouseUp={onUp}
+        onMouseDown={(e) => onDown(e)}
+        onMouseMove={(e) => onMove(e)}
+        onMouseUp={(e) => onUp(e)}
         onMouseLeave={() => {
           dragging.current = false;
         }}
-        onTouchStart={onDown}
-        onTouchMove={onMove}
-        onTouchEnd={onUp}
+        onTouchStart={(e) => onDown(e)}
+        onTouchMove={(e) => onMove(e)}
+        onTouchEnd={(e) => onUp(e)}
       />
     </div>
   );

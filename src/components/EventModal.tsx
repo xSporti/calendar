@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ClockPicker from './ClockPicker';
+import type { CalendarEvent, Calendar } from '../types';
 
 const RRULE_PRESETS = [
   { label: 'Keine Wiederholung', value: '' },
@@ -10,20 +11,32 @@ const RRULE_PRESETS = [
   { label: 'Jährlich', value: 'FREQ=YEARLY' },
 ];
 
-function toDateStr(date) {
+function toDateStr(date: Date | string | null | undefined): string {
   if (!date) return '';
   const d = new Date(date);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
 }
-function toTimeStr(date) {
+
+function toTimeStr(date: Date | string | null | undefined): string {
   if (!date) return '09:00';
   const d = new Date(date);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-function combine(dateStr, timeStr) {
-  if (!dateStr) return null;
+
+function combine(dateStr: string, timeStr: string): Date | undefined {
+  if (!dateStr) return undefined;
   return new Date(`${dateStr}T${timeStr}:00`);
+}
+
+interface Props {
+  event?: CalendarEvent | null;
+  defaultStart?: Date | string | null;
+  onSave: (data: CalendarEvent) => void;
+  onDelete: (scope?: 'all') => void;
+  onClose: () => void;
+  calendars: Calendar[];
+  defaultCalUid?: string;
 }
 
 export default function EventModal({
@@ -34,7 +47,7 @@ export default function EventModal({
   onClose,
   calendars,
   defaultCalUid,
-}) {
+}: Props) {
   const isNew = !event;
 
   const [title, setTitle] = useState('');
@@ -45,7 +58,7 @@ export default function EventModal({
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [rrule, setRrule] = useState('');
-  const [clockTarget, setClockTarget] = useState(null);
+  const [clockTarget, setClockTarget] = useState<'start' | 'end' | null>(null);
   const [allDay, setAllDay] = useState(false);
   const [calUid, setCalUid] = useState('');
 
@@ -96,8 +109,7 @@ export default function EventModal({
       allDay,
       description: description.trim(),
       location: location.trim(),
-
-      rrule: rrule || null,
+      rrule: rrule || undefined,
       calUid,
     });
   }
@@ -262,7 +274,10 @@ export default function EventModal({
         {/* actions */}
         <div className="modal-action mt-0">
           {!isNew && !rrule && (
-            <button className="btn btn-error btn-sm mr-auto" onClick={onDelete}>
+            <button
+              className="btn btn-error btn-sm mr-auto"
+              onClick={() => onDelete()}
+            >
               Löschen
             </button>
           )}
