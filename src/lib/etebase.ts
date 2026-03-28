@@ -4,19 +4,56 @@ import type { CalendarEvent } from '../types';
 
 let _account: Etebase.Account | null = null;
 
+const SESSION_KEY = 'etebase_session';
+const ENCRYPTION_KEY = 'etebase_enc_key';
+
+async function getOrCreateEncryptionKey(): Promise<Uint8Array> {
+  const stored = localStorage.getItem(ENCRYPTION_KEY);
+  if (stored) {
+    return new Uint8Array(JSON.parse(stored));
+  }
+  const key = crypto.getRandomValues(new Uint8Array(32));
+  localStorage.setItem(ENCRYPTION_KEY, JSON.stringify(Array.from(key)));
+  return key;
+}
+
 export async function login(
   serverUrl: string,
   username: string,
   password: string,
-): Promise<Etebase.Account> {
+) {
   await Etebase.ready;
   _account = await Etebase.Account.login(username, password, serverUrl);
+  const key = await getOrCreateEncryptionKey();
+  const session = await _account.save(key);
+  localStorage.setItem(SESSION_KEY, session);
   return _account;
 }
 
-export async function logout(): Promise<void> {
+export async function restoreSession(): Promise<boolean> {
+  const session = localStorage.getItem(SESSION_KEY);
+  const keyData = localStorage.getItem(ENCRYPTION_KEY);
+  if (!session || !keyData) return false;
+  try {
+    await Etebase.ready;
+    const key = new Uint8Array(JSON.parse(keyData));
+    _account = await Etebase.Account.restore(session, key);
+    return true;
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(ENCRYPTION_KEY);
+    return false;
+  }
+}
+
+export async function logout() {
   if (_account) await _account.logout();
   _account = null;
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(ENCRYPTION_KEY);
+}
+export function hasSession(): boolean {
+  return !!localStorage.getItem(SESSION_KEY);
 }
 
 export function getAccount(): Etebase.Account | null {
