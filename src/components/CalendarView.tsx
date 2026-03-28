@@ -32,17 +32,13 @@ export default function CalendarView({ onLogout }: Props) {
     loading,
     status,
     loadCalendars,
-    selectCalendar,
     selectAll,
-    sync,
     addEvent,
     editEvent,
     removeEvent,
     deleteCalendar,
   } = useCalendar();
 
-  const [selectedUid, setSelectedUid] = useState<string>('all');
-  const [selectedCal, setSelectedCal] = useState<Calendar | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [calModalOpen, setCalModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -53,26 +49,16 @@ export default function CalendarView({ onLogout }: Props) {
   const [calTitle, setCalTitle] = useState('');
   const [isToday, setIsToday] = useState(true);
   const [editingCal, setEditingCal] = useState<Calendar | null>(null);
+  const [activeUids, setActiveUids] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadCalendars().then((cols) => {
-      if (cols.length > 0) selectAll(cols);
+      if (cols.length > 0) {
+        setActiveUids(new Set(cols.map((c) => c.uid)));
+        selectAll(cols);
+      }
     });
   }, []);
-
-  function handleSelectCal(uid: string) {
-    if (uid === 'all') {
-      setSelectedUid('all');
-      setSelectedCal(null);
-      selectAll(calendars);
-    } else {
-      const found = calendars.find((c) => c.uid === uid);
-      if (!found) return;
-      setSelectedUid(uid);
-      setSelectedCal(found);
-      selectCalendar(found.col);
-    }
-  }
 
   function openEvent(ev: CalendarEvent | null) {
     setEditingEvent(ev);
@@ -131,6 +117,17 @@ export default function CalendarView({ onLogout }: Props) {
   async function handleDeleteCalendar(uid: string) {
     await deleteCalendar(uid);
     setEditingCal(null);
+  }
+
+  function toggleCalendar(uid: string) {
+    setActiveUids((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      const activeCols = calendars.filter((c) => next.has(c.uid));
+      selectAll(activeCols);
+      return next;
+    });
   }
 
   async function handleLogout() {
@@ -359,58 +356,64 @@ export default function CalendarView({ onLogout }: Props) {
             <li>
               <div
                 className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-lg hover:bg-base-300 transition-colors"
-                onClick={() => handleSelectCal('all')}
+                onClick={() => toggleCalendar('all')}
               >
                 <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-base-content/30" />
-                <span
-                  className={`text-sm truncate whitespace-nowrap flex-1 ${selectedUid === 'all' ? 'font-medium text-primary' : ''}`}
-                >
+                <span className="text-sm truncate whitespace-nowrap flex-1 font-medium text-primary">
                   Alle Kalender
                 </span>
               </div>
             </li>
-            {calendars.map((c, i) => (
-              <li key={c.uid} className="group relative">
-                <div
-                  className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-lg hover:bg-base-300 transition-colors"
-                  onClick={() => handleSelectCal(c.uid)}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{
-                      backgroundColor:
-                        c.color || COLORS[i % COLORS.length].value,
-                    }}
-                  />
-                  <span
-                    className={`text-sm truncate whitespace-nowrap flex-1 ${selectedUid === c.uid ? 'font-medium text-primary' : ''}`}
-                  >
-                    {c.name}
-                  </span>
-                  <button
-                    className="btn btn-ghost btn-xs btn-circle opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingCal(c);
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-3.5 h-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+            {calendars.map((c, i) => {
+              const isActive = activeUids.has(c.uid);
+              return (
+                <li key={c.uid} className="group relative">
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-base-300 transition-colors">
+                    <button
+                      className="flex items-center gap-2 flex-1 min-w-0"
+                      onClick={() => toggleCalendar(c.uid)}
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </button>
-                </div>
-              </li>
-            ))}
+                      <span
+                        className="w-3 h-3 rounded-sm shrink-0 transition-all border-2"
+                        style={{
+                          backgroundColor: isActive
+                            ? c.color || COLORS[i % COLORS.length].value
+                            : 'transparent',
+                          borderColor:
+                            c.color || COLORS[i % COLORS.length].value,
+                        }}
+                      />
+                      <span
+                        className={`text-sm truncate whitespace-nowrap flex-1 text-left transition-opacity ${!isActive ? 'opacity-40' : ''}`}
+                      >
+                        {c.name}
+                      </span>
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-xs btn-circle opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCal(c);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="mt-auto flex flex-col gap-1">
@@ -426,11 +429,12 @@ export default function CalendarView({ onLogout }: Props) {
             </button>
             <button
               className="btn btn-ghost btn-sm w-full justify-start"
-              onClick={() =>
-                selectedUid === 'all'
-                  ? selectAll(calendars)
-                  : sync(selectedCal?.col ?? null, false, calendars)
-              }
+              onClick={() => {
+                const activeCols = calendars.filter((c) =>
+                  activeUids.has(c.uid),
+                );
+                selectAll(activeCols);
+              }}
             >
               ↻ Sync
             </button>
@@ -493,9 +497,7 @@ export default function CalendarView({ onLogout }: Props) {
             onDelete={handleDelete}
             onClose={() => setModalOpen(false)}
             calendars={calendars}
-            defaultCalUid={
-              selectedUid === 'all' ? calendars[0]?.uid : selectedUid
-            }
+            defaultCalUid={calendars.find((c) => activeUids.has(c.uid))?.uid}
           />
         )}
 
