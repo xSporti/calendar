@@ -15,6 +15,10 @@ export function useCalendar() {
   const [status, setStatus] = useState('');
   const itemCache = useRef<Record<string, CachedItem>>({});
   const itemManager = useRef<Etebase.ItemManager | null>(null);
+  const syncState = useRef<{ col: Etebase.Collection | null; all: boolean }>({
+    col: null,
+    all: false,
+  });
 
   const showStatus = useCallback((msg: string) => {
     setStatus(msg);
@@ -42,6 +46,7 @@ export function useCalendar() {
 
   const selectCalendar = useCallback(
     async (col: Etebase.Collection) => {
+      syncState.current = { col, all: false };
       setLoading(true);
       showStatus('Lädt…');
       itemManager.current = EteService.getItemManager(col);
@@ -65,6 +70,7 @@ export function useCalendar() {
 
   const selectAll = useCallback(
     async (cols: Calendar[]) => {
+      syncState.current = { col: null, all: true };
       setLoading(true);
       showStatus('Lädt alle Kalender…');
       const allEvents: Partial<CalendarEvent>[] = [];
@@ -122,7 +128,6 @@ export function useCalendar() {
       (item as CachedItem)._mgr = mgr;
       itemCache.current[uid] = item as CachedItem;
 
-      setEvents((prev) => [...prev, { ...data, id: uid }]);
       showStatus('Gespeichert ✓');
     },
     [showStatus, calendars],
@@ -171,9 +176,6 @@ export function useCalendar() {
         });
       }
 
-      setEvents((prev) =>
-        prev.map((e) => (e.id === uid ? { ...e, ...data } : e)),
-      );
       showStatus('Gespeichert ✓');
     },
     [showStatus, calendars],
@@ -182,7 +184,7 @@ export function useCalendar() {
   const removeEvent = useCallback(
     async (
       uid: string,
-      mode: 'all' | 'this' = 'all',
+      mode: 'all' | 'this' | 'following' = 'all',
       evData: CalendarEvent | null = null,
     ) => {
       const item = itemCache.current[uid];
@@ -192,15 +194,19 @@ export function useCalendar() {
 
       if (mode === 'this' && evData?.start) {
         await EteService.excludeEventInstance(mgr, item, evData.start);
+        await selectAll(calendars);
+      } else if (mode === 'following' && evData?.start) {
+        await EteService.truncateFromInstance(mgr, item, evData.start);
+        await selectAll(calendars);
       } else {
         await EteService.deleteEvent(mgr, item);
         delete itemCache.current[uid];
+        setEvents((prev) => prev.filter((e) => e.id !== uid));
       }
 
-      setEvents((prev) => prev.filter((e) => e.id !== uid));
       showStatus('Gelöscht ✓');
     },
-    [showStatus],
+    [showStatus, selectAll, calendars],
   );
 
   const deleteCalendar = useCallback(

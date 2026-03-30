@@ -1,11 +1,102 @@
 import * as Etebase from 'etebase';
-import ICAL from 'ical.js';
 import type { CalendarEvent } from '../types';
 
+import ICAL from 'ical.js';
+import { tzlib_get_ical_block } from 'timezones-ical-library';
+
+function getIcalTimezone(tzid: string): ICAL.Timezone {
+  const existing = ICAL.TimezoneService.get(tzid);
+  if (existing) return existing;
+
+  const raw = tzlib_get_ical_block(tzid);
+  if (!raw || raw.length === 0) {
+    throw new Error(`Unbekannte Timezone: ${tzid}`);
+  }
+
+  const inner = Array.isArray(raw) ? raw.join('\r\n') : raw;
+
+  // ✅ WICHTIG: tzlib liefert nur den Inhalt — wir bauen den VTIMEZONE-Container selbst
+  const vtimezoneString = ['BEGIN:VTIMEZONE', inner, 'END:VTIMEZONE'].join(
+    '\r\n',
+  );
+
+  const comp = new ICAL.Component(ICAL.parse(vtimezoneString));
+  const tz = new ICAL.Timezone({ tzid, component: comp });
+  ICAL.TimezoneService.register(tz);
+  return tz;
+}
+
+const TEST_TIMEZONES = [
+  'Europe/Berlin',
+  'Europe/London',
+  'America/New_York',
+  'America/Los_Angeles',
+  'America/Sao_Paulo',
+  'Asia/Tokyo',
+  'Asia/Dubai',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'Asia/Kolkata',
+  'UTC',
+];
+
+let passed = 0;
+let failed = 0;
+
+for (const tzid of TEST_TIMEZONES) {
+  try {
+    const tz = getIcalTimezone(tzid);
+    const again = ICAL.TimezoneService.get(tzid);
+
+    if (!again) {
+      throw new Error('nach Registrierung nicht im TimezoneService gefunden');
+    }
+
+    if (again.tzid !== tzid) {
+      throw new Error(`falsche tzid: ${again.tzid}`);
+    }
+
+    console.log(`✅ ${tzid}`);
+    passed++;
+  } catch (err) {
+    console.error(`💥 ${tzid}: ${(err as Error).message}`);
+    failed++;
+  }
+}
+
+console.log(`\n${passed + failed} Tests — ${passed} ✅  ${failed} ❌`);
+
+if (failed > 0) {
+  throw new Error(`${failed} Tests fehlgeschlagen`);
+}
+/* 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
 let _account: Etebase.Account | null = null;
 
 const SESSION_KEY = 'etebase_session';
 const ENCRYPTION_KEY = 'etebase_enc_key';
+
+const fmtUTC = (d: Date): string =>
+  d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+const fmtDate = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+};
 
 async function getOrCreateEncryptionKey(): Promise<Uint8Array> {
   const stored = localStorage.getItem(ENCRYPTION_KEY);
@@ -86,7 +177,10 @@ function parseICS(
     const ev = new ICAL.Event(vevent);
     const isAllDay = ev.startDate.isDate;
 
-    const result: Partial<CalendarEvent> & { dtstart?: string } = {
+    const result: Partial<CalendarEvent> & {
+      dtstart?: string;
+      duration?: string;
+    } = {
       title: ev.summary || '(kein Titel)',
       start: ev.startDate.toJSDate(),
       end: ev.endDate ? ev.endDate.toJSDate() : undefined,
@@ -98,9 +192,27 @@ function parseICS(
     const rrule = vevent.getFirstPropertyValue('rrule');
     if (rrule) {
       result.rrule = rrule.toString();
+
+      // Lokale Zeit ohne Z — verhindert falsche UTC-Interpretation im rrule Plugin
       const d = ev.startDate.toJSDate();
       const pad = (n: number) => String(n).padStart(2, '0');
       result.dtstart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+      // Duration aus Start/End berechnen
+      if (ev.endDate) {
+        const diffMs =
+          ev.endDate.toJSDate().getTime() - ev.startDate.toJSDate().getTime();
+        const diffH = Math.floor(diffMs / 3600000);
+        const diffM = Math.floor((diffMs % 3600000) / 60000);
+        result.duration = `${String(diffH).padStart(2, '0')}:${String(diffM).padStart(2, '0')}`;
+      }
+
+      const exdates = vevent.getAllProperties('exdate');
+      if (exdates.length > 0) {
+        result.exdate = exdates.map((ex: any) =>
+          ex.getFirstValue().toJSDate().toISOString(),
+        );
+      }
     }
 
     return result;
@@ -117,7 +229,9 @@ interface BuildICSParams {
   description?: string;
   location?: string;
   rrule?: string;
+  exdate?: string[];
   allDay?: boolean;
+  timezone?: string;
 }
 
 export function buildICS({
@@ -129,31 +243,57 @@ export function buildICS({
   location,
   rrule,
   allDay,
-}: BuildICSParams): string {
-  const fmt = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const fmtDate = (d: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-  };
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//sporti-cal//DE',
-    'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${fmt(new Date())}`,
-    allDay ? `DTSTART;VALUE=DATE:${fmtDate(start)}` : `DTSTART:${fmt(start)}`,
-    allDay
-      ? `DTEND;VALUE=DATE:${fmtDate(end || start)}`
-      : `DTEND:${fmt(end || start)}`,
-    `SUMMARY:${title || ''}`,
-  ];
-  if (description) lines.push(`DESCRIPTION:${description}`);
-  if (location) lines.push(`LOCATION:${location}`);
-  if (rrule) lines.push(`RRULE:${rrule}`);
-  lines.push('END:VEVENT', 'END:VCALENDAR');
-  return lines.join('\r\n');
+  timezone = 'Europe/Berlin',
+}: BuildICSParams & { timezone?: string }): string {
+  const cal = new ICAL.Component(['vcalendar', [], []]);
+  cal.updatePropertyWithValue('prodid', '-//sporti-cal//DE');
+  cal.updatePropertyWithValue('version', '2.0');
+
+  const tz = ICAL.TimezoneService.get(timezone);
+  if (tz && !allDay) {
+    cal.addSubcomponent(tz.component);
+  }
+
+  const vevent = new ICAL.Component('vevent');
+  vevent.updatePropertyWithValue('uid', uid);
+  vevent.updatePropertyWithValue('summary', title || '');
+  vevent.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+
+  if (allDay) {
+    vevent.updatePropertyWithValue(
+      'dtstart',
+      ICAL.Time.fromDateString(start.toISOString().slice(0, 10)),
+    );
+    // end fehlt → automatisch +1 Tag
+    const endDate = end ?? new Date(start.getTime() + 86400000);
+    vevent.updatePropertyWithValue(
+      'dtend',
+      ICAL.Time.fromDateString(endDate.toISOString().slice(0, 10)),
+    );
+  } else {
+    const dtstart = ICAL.Time.fromJSDate(start, false);
+    dtstart.zone = tz ?? ICAL.Timezone.utcTimezone;
+    const dtStartProp = vevent.updatePropertyWithValue('dtstart', dtstart);
+    dtStartProp.setParameter('tzid', timezone);
+
+    if (end) {
+      const dtend = ICAL.Time.fromJSDate(end, false);
+      dtend.zone = tz ?? ICAL.Timezone.utcTimezone;
+      const dtEndProp = vevent.updatePropertyWithValue('dtend', dtend);
+      dtEndProp.setParameter('tzid', timezone);
+    }
+  }
+
+  if (description) vevent.updatePropertyWithValue('description', description);
+  if (location) vevent.updatePropertyWithValue('location', location);
+  if (rrule) {
+    const rruleProp = new ICAL.Property('rrule');
+    rruleProp.setValue(ICAL.Recur.fromString(rrule));
+    vevent.addProperty(rruleProp);
+  }
+
+  cal.addSubcomponent(vevent);
+  return cal.toString();
 }
 
 interface LoadEventsResult {
@@ -226,11 +366,33 @@ export async function excludeEventInstance(
   item: Etebase.Item,
   instanceStart: Date | string,
 ): Promise<void> {
-  const content = await item.getContent(Etebase.OutputFormat.String);
-  const fmt = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const exdate = `EXDATE:${fmt(new Date(instanceStart))}`;
+  const content = await item.getContent(1);
+  const exdate = `EXDATE:${fmtUTC(new Date(instanceStart))}`;
+
+  if (content.includes(exdate)) return;
+
   const updated = content.replace('END:VEVENT', `${exdate}\r\nEND:VEVENT`);
+  const meta = await item.getMeta();
+  await item.setContent(updated);
+  await item.setMeta({ ...meta, mtime: Date.now() });
+  await itemManager.batch([item]);
+}
+
+export async function truncateFromInstance(
+  itemManager: Etebase.ItemManager,
+  item: Etebase.Item,
+  instanceStart: Date | string,
+): Promise<void> {
+  const content = await item.getContent(1); // war OutputFormat.String — fix!
+  const until = new Date(new Date(instanceStart).getTime() - 86400 * 1000);
+
+  const updated = content.replace(/RRULE:([^\r\n]+)/, (_, rruleBody) => {
+    const cleaned = rruleBody
+      .replace(/;?COUNT=\d+/, '')
+      .replace(/;?UNTIL=[^;]+/, '');
+    return `RRULE:${cleaned};UNTIL=${fmtUTC(until)}`;
+  });
+
   const meta = await item.getMeta();
   await item.setContent(updated);
   await item.setMeta({ ...meta, mtime: Date.now() });

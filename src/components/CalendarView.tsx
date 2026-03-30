@@ -39,6 +39,27 @@ export default function CalendarView({ onLogout }: Props) {
     deleteCalendar,
   } = useCalendar();
 
+  const handleRemoveEvent = (mode: 'all' | 'this' | 'following') => {
+    console.log('[handleRemoveEvent] GESTARTET mit mode:', mode); // ← HINZUFÜGEN
+
+    if (!editingEvent?.id) {
+      console.warn('[handleRemoveEvent] KEIN editingEvent!');
+      return;
+    }
+
+    console.log('[handleRemoveEvent] UID:', editingEvent.id); // ← HINZUFÜGEN
+    removeEvent(editingEvent.id, mode, editingEvent);
+
+    setTimeout(() => {
+      console.log('[handleRemoveEvent] TIMER:', calendarRef.current); // ← HINZUFÜGEN
+      const calendarApi = calendarRef.current?.getApi();
+      if (calendarApi) {
+        calendarApi.refetchEvents();
+        console.log('[handleRemoveEvent] REFETCH DONE');
+      }
+    }, 800);
+  };
+
   const [modalOpen, setModalOpen] = useState(false);
   const [calModalOpen, setCalModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -80,12 +101,8 @@ export default function CalendarView({ onLogout }: Props) {
     } else {
       await addEvent(data);
     }
-  }
-
-  async function handleDelete(mode: 'all' | 'this' = 'all') {
-    if (!editingEvent) return;
-    setModalOpen(false);
-    await removeEvent(editingEvent.id!, mode, editingEvent);
+    const activeCols = calendars.filter((c) => activeUids.has(c.uid));
+    await selectAll(activeCols);
   }
 
   async function handleCreateCalendar(data: {
@@ -194,7 +211,7 @@ export default function CalendarView({ onLogout }: Props) {
         ...base,
         allDay: ev.allDay || false,
         rrule: {
-          dtstart: ev.dtstart, // lokale Zeit ohne Z — kommt aus etebase.js
+          dtstart: ev.dtstart,
           ...Object.fromEntries(
             ev.rrule.split(';').map((part) => {
               const [k, v] = part.split('=');
@@ -202,6 +219,7 @@ export default function CalendarView({ onLogout }: Props) {
             }),
           ),
         },
+        exdate: ev.exdate,
         duration: ev.duration || '01:00',
       };
     }
@@ -494,7 +512,7 @@ export default function CalendarView({ onLogout }: Props) {
             event={editingEvent}
             defaultStart={defaultStart}
             onSave={handleSave}
-            onDelete={handleDelete}
+            onDelete={handleRemoveEvent}
             onClose={() => setModalOpen(false)}
             calendars={calendars}
             defaultCalUid={calendars.find((c) => activeUids.has(c.uid))?.uid}

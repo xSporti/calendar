@@ -16,6 +16,7 @@ export interface CalendarEvent {
   title?: string;
   start?: Date;
   end?: Date;
+  exdate?: string[];
   allDay?: boolean;
   description?: string;
   location?: string;

@@ -16,13 +16,15 @@
     "@fullcalendar/rrule": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.11",
     "etebase": "^0.43.1",
-    "ical.js": "^1.5.0",
+    "ical.js": "^2.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "rrule": "^2.8.1"
+    "rrule": "^2.8.1",
+    "timezones-ical-library": "^2.1.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^25.5.0",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.1",

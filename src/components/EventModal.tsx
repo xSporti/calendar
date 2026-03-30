@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import ClockPicker from './ClockPicker';
 import type { CalendarEvent, Calendar } from '../types';
+import { DeleteEventDialog } from './DeleteEventDialog';
 
 const RRULE_PRESETS = [
   { label: 'Keine Wiederholung', value: '' },
@@ -14,14 +15,15 @@ const RRULE_PRESETS = [
 function toDateStr(date: Date | string | null | undefined): string {
   if (!date) return '';
   const d = new Date(date);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function toTimeStr(date: Date | string | null | undefined): string {
   if (!date) return '09:00';
   const d = new Date(date);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function combine(dateStr: string, timeStr: string): Date | undefined {
@@ -33,7 +35,7 @@ interface Props {
   event?: CalendarEvent | null;
   defaultStart?: Date | string | null;
   onSave: (data: CalendarEvent) => void;
-  onDelete: (scope?: 'all') => void;
+  onDelete: (mode: 'all' | 'this' | 'following') => void;
   onClose: () => void;
   calendars: Calendar[];
   defaultCalUid?: string;
@@ -61,6 +63,7 @@ export default function EventModal({
   const [clockTarget, setClockTarget] = useState<'start' | 'end' | null>(null);
   const [allDay, setAllDay] = useState(false);
   const [calUid, setCalUid] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -273,20 +276,15 @@ export default function EventModal({
 
         {/* actions */}
         <div className="modal-action mt-0">
-          {!isNew && !rrule && (
+          {!isNew && (
             <button
               className="btn btn-error btn-sm mr-auto"
-              onClick={() => onDelete()}
+              onClick={() => {
+                console.log('[EventModal] Löschen geklickt'); // ← HINZUFÜGEN
+                setShowDeleteDialog(true);
+              }}
             >
               Löschen
-            </button>
-          )}
-          {!isNew && rrule && (
-            <button
-              className="btn btn-error btn-sm mr-auto"
-              onClick={() => onDelete('all')}
-            >
-              Alle löschen
             </button>
           )}
           <button className="btn btn-ghost btn-sm" onClick={onClose}>
@@ -300,6 +298,18 @@ export default function EventModal({
             Speichern
           </button>
         </div>
+
+        {showDeleteDialog && (
+          <DeleteEventDialog
+            isRecurring={!!rrule}
+            onConfirm={(mode) => {
+              setShowDeleteDialog(false);
+              onDelete(mode);
+              onClose();
+            }}
+            onCancel={() => setShowDeleteDialog(false)}
+          />
+        )}
       </div>
       <div className="modal-backdrop" onClick={onClose} />
     </dialog>
